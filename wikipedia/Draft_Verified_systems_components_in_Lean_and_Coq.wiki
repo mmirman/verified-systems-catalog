@@ -1,0 +1,112 @@
+{{Short description|Software and hardware components with machine-checked Lean or Coq correctness proofs}}
+{{Draft topics|computer science|software}}
+
+'''Verified systems components in Lean and Coq''' are compilers, operating-system components, storage systems, distributed services, cryptographic routines, and hardware designs for which stated correctness properties have been proved with the [[Lean (proof assistant)|Lean]] or [[Rocq|Coq/Rocq]] proof assistant. A component is not verified without qualification: a proof establishes a proposition about a formal model and implementation under stated assumptions.<ref>{{cite journal |last1=Appel |first1=Andrew W. |last2=Beringer |first2=Lennart |last3=Chlipala |first3=Adam |last4=Pierce |first4=Benjamin C. |title=Position paper: the science of deep specification |journal=Philosophical Transactions of the Royal Society A |volume=375 |issue=2104 |year=2017 |doi=10.1098/rsta.2016.0331}}</ref>
+
+The list below uses ''component'' for the artifact linked to a checked theorem. It distinguishes implementation refinement from proofs about models and records major trusted assumptions. It excludes projects verified only with Isabelle/HOL, HOL4, Dafny, F*, Verus, or model checking.
+
+== Coq/Rocq components ==
+
+=== Compilers and program verification ===
+
+;CompCert
+:'''Artifact:''' The verified passes from a typed CompCert C abstract-syntax tree to target assembly abstract syntax.
+:'''Specification:''' If compilation of source program <math>S</math> succeeds with target <math>C</math>, every observable behavior of <math>C</math> is allowed by, or improves on an allowed behavior of, <math>S</math>. The result composes pass-level simulations between formal operational semantics.<ref>{{cite web |title=CompCert C: a trustworthy compiler—Formal verification |url=https://compcert.org/man/manual001.html |website=CompCert |access-date=2 November 2026}}</ref>
+:'''Boundary:''' Preprocessing, parsing and source elaboration precede the theorem; assembly, linking, hardware, and those tools' conformance to the target model remain outside its central semantic-preservation result.
+
+;Verified Software Toolchain (VST)
+:'''Artifact:''' Individually proved C functions, including a SHA-256 case study, interpreted using CompCert's Clight semantics.
+:'''Specification:''' A separation-logic judgment proves that a function satisfying a precondition over values, permissions and memory resources terminates or proceeds only in ways permitted by its function specification and establishes its postcondition while preserving framed resources. VST soundness connects this judgment to Clight execution.<ref>{{cite web |title=Verified Software Toolchain |url=https://vst.cs.princeton.edu/ |publisher=Princeton University |access-date=2 November 2026}}</ref>
+:'''Boundary:''' VST is a verification framework, not a proof of arbitrary C. Each function needs a proof and an adequate specification; external-call models and compilation boundaries remain relevant.
+
+;bedrock2
+:'''Artifact:''' Programs in the bedrock2 imperative language and its compiler toward RISC-V.
+:'''Specification:''' Compiled machine execution simulates the source operational semantics under the memory and external-call premises. Individual routines additionally satisfy weakest-precondition/Hoare contracts over memory and I/O traces.<ref>{{cite web |title=bedrock2 |url=https://github.com/mit-plv/bedrock2 |website=GitHub |access-date=2 November 2026}}</ref>
+:'''Boundary:''' The theorem is relative to the RISC-V and device/external-call models and the documented assembly, linking and loading boundary.
+
+=== Kernels and storage ===
+
+;CertiKOS mC2
+:'''Artifact:''' A multicore kernel and hypervisor built from certified abstraction layers.
+:'''Specification:''' Each concrete concurrent layer contextually refines an abstract machine layer, so every observable concrete behavior is permitted by the abstract interface; compositional refinement links low-level modules to the top-level kernel contract.<ref>{{cite conference |last1=Gu |first1=Ronghui |title=CertiKOS: An Extensible Architecture for Building Certified Concurrent OS Kernels |conference=OSDI |year=2016 |url=https://www.usenix.org/conference/osdi16/technical-sessions/presentation/gu}}</ref>
+:'''Boundary:''' Guest operating systems, unmodeled devices and firmware, and physical hardware correctness are not consequences of the layer proof.
+
+;FSCQ
+:'''Artifact:''' An executable Unix-like file system.
+:'''Specification:''' Crash Hoare Logic triples specify normal and crash outcomes. At every modeled crash point, recovery must establish the representation invariant and an abstract state permitted by the file-system specification; the property composes over repeated crash/recovery cycles.<ref>{{cite conference |last1=Chen |first1=Haogang |title=Using Crash Hoare Logic for Certifying the FSCQ File System |conference=SOSP |year=2015 |doi=10.1145/2815400.2815402}}</ref>
+:'''Boundary:''' The result assumes the disk model and does not prove physical media reliability or application durability where the API contract was not followed.
+
+;DaisyNFS
+:'''Artifact:''' A concurrent, crash-safe network file server written in the Goose subset of Go.
+:'''Specification:''' File operations are logically atomic relative to an abstract file-system state; durable operations survive modeled crashes; recovery restores the durable invariant; and concurrent histories refine the abstract API.<ref>{{cite conference |last1=Chajed |first1=Tej |title=GoJournal and DaisyNFS: Verified Concurrent, Crash-Safe Systems |conference=SOSP |year=2021 |url=https://pdos.csail.mit.edu/papers/daisy-nfs:sosp21.pdf}}</ref>
+:'''Boundary:''' Goose translation, Go compilation/runtime, and the modeled disk and network interfaces delimit the theorem.
+
+;GoJournal
+:'''Artifact:''' A concurrent write-ahead logging library in Go/Goose.
+:'''Specification:''' Committed transactions refine atomic durable-state updates; after a crash, recovery exposes an outcome allowed by the transaction protocol, while concurrent use satisfies a logically atomic library specification.<ref name="daisynfs">{{cite conference |last1=Chajed |first1=Tej |title=GoJournal and DaisyNFS: Verified Concurrent, Crash-Safe Systems |conference=SOSP |year=2021 |url=https://pdos.csail.mit.edu/papers/daisy-nfs:sosp21.pdf}}</ref>
+
+=== Distributed systems ===
+
+;Verdi Raft
+:'''Artifact:''' A Raft consensus implementation expressible as executable OCaml through extraction.
+:'''Specification:''' Under Verdi's failure/network semantics, all reachable states satisfy the proved Raft safety invariants, including agreement of committed log entries and replicated-state-machine safety. The core claim is safety rather than unconditional progress during arbitrary partitions.<ref>{{cite conference |last1=Wilcox |first1=James R. |title=Verdi: a framework for implementing and formally verifying distributed systems |conference=PLDI |year=2015 |doi=10.1145/2737924.2737958}}</ref>
+:'''Boundary:''' Extraction, runtime shims, operating system and network stack are not established by the Coq network-model theorem.
+
+;Verdi LockServ
+:'''Artifact:''' A message-passing lock server.
+:'''Specification:''' Every reachable modeled network state satisfies mutual exclusion: two distinct clients cannot simultaneously own the lock. A separate labeled-network development treats liveness under fairness premises.<ref name="verdi-repo">{{cite web |title=Verdi |url=https://github.com/uwplse/verdi |website=GitHub |access-date=2 November 2026}}</ref>
+
+;Verdi VarD with primary-backup replication
+:'''Artifact:''' A key-value service transformed by sequence-numbering and asynchronous primary-backup modules.
+:'''Specification:''' The transformed system's externally visible traces refine those of the source service. The sequence-numbering and primary-backup transformations preserve their stated trace properties under the modeled failures.<ref name="verdi-repo" />
+:'''Boundary:''' The model does not provide Byzantine fault tolerance or availability during indefinite failure.
+
+=== Cryptography and hardware ===
+
+;Fiat Cryptography
+:'''Artifact:''' Generated C routines for arithmetic in cryptographic prime fields.
+:'''Specification:''' With inputs satisfying representation bounds, each generated add, subtract, multiply, square or other supported routine returns an encoding congruent to the corresponding operation in <math>\mathbb Z/p\mathbb Z</math> and establishes the output bounds required by later routines. Synthesis transformations preserve these contracts.<ref>{{cite conference |last1=Erbsen |first1=Andres |title=Simple High-Level Code for Cryptographic Arithmetic—With Proofs, Without Compromises |conference=IEEE Symposium on Security and Privacy |year=2019 |doi=10.1109/SP.2019.00005}}</ref>
+:'''Boundary:''' Field-operation correctness is not by itself protocol correctness, entropy/key-management correctness or a complete side-channel proof of a compiled binary.
+
+;Kami
+:'''Artifact:''' Parameterized hardware modules and their transformations toward RTL.
+:'''Specification:''' A concrete Kami module refines an abstract module when each implementation trace is matched by an allowed abstract trace under the formal simulation relation. Modular rules compose refinement across connected modules and scheduled rules.<ref>{{cite conference |last1=Choi |first1=Joonwon |title=Kami: a platform for high-level parametric hardware specification and its modular verification |conference=ICFP |year=2017 |doi=10.1145/3110268}}</ref>
+:'''Boundary:''' The proofs concern the digital semantics and documented translation chain, not fabrication, analog behavior, power or physical timing.
+
+== Lean components ==
+
+The number of established end-to-end systems artifacts proved in Lean is smaller than the corresponding Coq literature. Model-level work is therefore labeled explicitly.
+
+;Lean protocol-support examples
+:'''Artifact:''' Executable network-protocol transition systems developed with Galois's Lean protocol-support library.
+:'''Specification:''' Protocol-specific invariants show that every globally reachable modeled network state satisfies a safety predicate; compositional results reduce global preservation to local component transitions.<ref>{{cite web |title=lean-protocol-support |url=https://github.com/GaloisInc/lean-protocol-support |website=GitHub |access-date=2 November 2026}}</ref>
+:'''Boundary:''' A proved transition-system model does not automatically verify a separately written production implementation or its network stack.
+
+;Perennial Lean branch
+:'''Artifact:''' Go functions translated by Goose and reasoned about with Iris Lean.
+:'''Specification:''' Each translated Go function has a Hoare triple; proofs take specifications of callees as premises and linking discharges those premises to produce package-level weakest-precondition theorems. The current Lean branch states that it covers concurrency without crash/recovery reasoning.<ref>{{cite web |title=Perennial |url=https://github.com/mit-pdos/perennial |website=GitHub |access-date=2 November 2026}}</ref>
+:'''Boundary:''' Historical Perennial crash-safety results are Coq/Iris results. Untranslated Go, the runtime and compiler are outside the current Lean function proofs.
+
+;LeanOS model components
+:'''Artifact:''' Kernel-interface and device-policy reference models paired with an experimental bootable kernel.
+:'''Specification:''' Named Lean theorems establish stated preconditions/postconditions, finite state invariants and policy-confinement properties of the reference models.
+:'''Boundary:''' The project states that model-to-C-executor correspondence is tested rather than fully proved. Handwritten C and assembly, code generation, compiler, linker, firmware/emulator and hardware remain trusted, and its maintainers do not describe it as a verified operating system.<ref>{{cite web |title=LeanOS |url=https://github.com/rudi-cilibrasi/leanos |website=GitHub |access-date=2 November 2026}}</ref>
+
+== Interpreting verification claims ==
+
+The propositions above have different strengths. ''Functional correctness'' connects all modeled implementation behaviors to an abstract contract; ''invariant preservation'' rules out stated bad states in a model; ''linearizability'' relates concurrent histories to atomic operations; and ''crash safety'' constrains states after interruptions and recovery. None entails correctness of assumptions below the theorem, such as hardware models, compilers, runtimes, extraction mechanisms, environmental fairness, or the adequacy of the high-level specification.<ref>{{cite journal |last1=Klein |first1=Gerwin |title=Verified Systems |journal=Communications of the ACM |volume=52 |issue=10 |year=2009 |pages=107–115 |doi=10.1145/1562764.1562783}}</ref>
+
+== See also ==
+* [[Formal verification]]
+* [[Proof assistant]]
+* [[Compiler correctness]]
+* [[Refinement (computing)]]
+* [[Linearizability]]
+
+== References ==
+{{Reflist}}
+
+{{DEFAULTSORT:Verified systems components in Lean and Coq}}
+[[Category:Formal methods]]
+[[Category:Software verification]]
+[[Category:Proof assistants]]
